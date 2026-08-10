@@ -1,6 +1,9 @@
-# Updesh Residency — API
+# Updesh Residency — Backend
 
 Express + TypeScript REST API for the Updesh Residency property marketplace.
+
+> **GitHub repo:** `harshkumar1302/updesh-api`  
+> **Local folder:** `backend/` (inside the parent `updesh` project)
 
 ## Quick start
 
@@ -9,7 +12,7 @@ pnpm install
 pnpm dev          # http://localhost:4000
 ```
 
-Seeds `data/db.json` on first run. Delete it to re-seed. Uploads go to `uploads/`.
+Seeds `data/db.json` on first run. Delete it to re-seed.
 
 ## Environment
 
@@ -17,6 +20,15 @@ Seeds `data/db.json` on first run. Delete it to re-seed. Uploads go to `uploads/
 |----------|---------|-------------|
 | `PORT` | `4000` | Server port |
 | `JWT_SECRET` | dev default | Token signing secret |
+
+## Local-only folders (never commit)
+
+| Folder | Purpose |
+|--------|---------|
+| `data/` | JSON database (`db.json`) |
+| `uploads/` | User-uploaded property photos |
+
+Seed/demo property images are **not** stored here — they live in the frontend repo at `frontend/apps/web/public/images/properties/`.
 
 ## Demo accounts
 
@@ -26,4 +38,4 @@ Seeds `data/db.json` on first run. Delete it to re-seed. Uploads go to `uploads/
 
 ## Shared types
 
-`packages/shared-types` is the source of truth for API contracts. When you change types here, copy the same folder into the frontend repo (`updesh-app/packages/shared-types`).
+`packages/shared-types` is the source of truth for API contracts. When you change types here, copy the same folder into `frontend/packages/shared-types`.
