@@ -28,7 +28,9 @@ Seeds `data/db.json` on first run. Delete it to re-seed.
 | `data/` | JSON database (`db.json`) |
 | `uploads/` | User-uploaded property photos |
 
-Seed/demo property images are **not** stored here — they live in the frontend repo at `frontend/apps/web/public/images/properties/`.
+Seed/demo property images are **not** stored here — they live in `web-app/public/images/properties/`.
+
+The website (`web-app`) and mobile app (`app`) both call this API. CORS is enabled so browsers and Expo can reach it from another origin.
 
 ## Demo accounts
 

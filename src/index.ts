@@ -1,5 +1,6 @@
 import path from 'node:path';
 import express from 'express';
+import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import type { Lead, Property } from '@updesh/shared-types';
@@ -12,6 +13,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 load();
 
 const app = express();
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: '1mb' }));
 app.use('/uploads', express.static(UPLOADS_DIR));
 
