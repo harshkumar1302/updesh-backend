@@ -420,7 +420,141 @@ app.post('/api/users/me/saved/:propertyId', requireAuth, (req, res) => {
   res.json({ saved: idx < 0 });
 });
 
+app.get('/api/users/me/property-leads', requireAuth, (req, res) => {
+  const myPropertyIds = new Set(
+    db.properties.filter((p) => p.sellerId === req.user!.id).map((p) => p.id)
+  );
+  const leads = db.leads
+    .filter((l) => l.propertyId && myPropertyIds.has(l.propertyId))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((l) => {
+      const serialized = serializeLead(l, { populateProperty: true });
+      return { ...serialized, property: l.propertyId ? db.properties.find((p) => p.id === l.propertyId) : undefined };
+    })
+    .map((l) => {
+      if (l.property && typeof l.property !== 'string') {
+        return { ...l, property: serializeProperty(l.property as DbProperty) };
+      }
+      return l;
+    });
+  res.json({ leads });
+});
+
 // ---------- admin ----------
+
+app.get('/api/admin/dashboard', requireRole('admin'), (_req, res) => {
+  const cutoff = Date.now() - 30 * DAY_MS;
+  const cityCounts: Record<string, number> = {};
+  for (const p of db.properties.filter((p) => p.status === 'live')) {
+    cityCounts[p.city] = (cityCounts[p.city] || 0) + 1;
+  }
+  res.json({
+    totalUsers: db.users.length,
+    totalBuyers: db.users.filter((u) => u.role === 'buyer').length,
+    totalSellers: db.users.filter((u) => u.role === 'seller').length,
+    totalAdmins: db.users.filter((u) => u.role === 'admin').length,
+    totalProperties: db.properties.length,
+    liveProperties: db.properties.filter((p) => p.status === 'live').length,
+    pendingProperties: db.properties.filter((p) => p.status === 'pending_review').length,
+    rejectedProperties: db.properties.filter((p) => p.status === 'rejected').length,
+    soldProperties: db.properties.filter((p) => p.status === 'sold').length,
+    totalLeads: db.leads.length,
+    newLeads: db.leads.filter((l) => l.status === 'new').length,
+    contactedLeads: db.leads.filter((l) => l.status === 'contacted').length,
+    closedLeads: db.leads.filter((l) => l.status === 'closed').length,
+    inventoryValue: db.properties
+      .filter((p) => p.status === 'live' && p.listingType === 'buy')
+      .reduce((sum, p) => sum + p.price, 0),
+    recentSignups30d: db.users.filter((u) => new Date(u.createdAt).getTime() >= cutoff).length,
+    recentProperties30d: db.properties.filter((p) => new Date(p.createdAt).getTime() >= cutoff).length,
+    recentLeads30d: db.leads.filter((l) => new Date(l.createdAt).getTime() >= cutoff).length,
+    cityCounts,
+  });
+});
+
+app.get('/api/admin/users', requireRole('admin'), (req, res) => {
+  let users = [...db.users];
+  if (req.query.role) users = users.filter((u) => u.role === req.query.role);
+  users.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  res.json({
+    users: users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      phone: u.phone,
+      role: u.role,
+      createdAt: u.createdAt,
+      listingsCount: db.properties.filter((p) => p.sellerId === u.id).length,
+      leadsCount: db.leads.filter((l) => l.userId === u.id).length,
+    })),
+    total: users.length,
+  });
+});
+
+app.patch('/api/admin/users/:id/role', requireRole('admin'), (req, res) => {
+  const user = db.users.find((u) => u.id === req.params.id);
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  const { role } = req.body ?? {};
+  if (!['buyer', 'seller', 'admin'].includes(role)) {
+    res.status(400).json({ error: 'Role must be buyer, seller, or admin' });
+    return;
+  }
+  user.role = role;
+  save();
+  res.json({
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      createdAt: user.createdAt,
+      listingsCount: db.properties.filter((p) => p.sellerId === user.id).length,
+      leadsCount: db.leads.filter((l) => l.userId === user.id).length,
+    },
+  });
+});
+
+app.get('/api/admin/properties', requireRole('admin'), (req, res) => {
+  const q = req.query;
+  let results = [...db.properties];
+  if (q.status) results = results.filter((p) => p.status === q.status);
+  if (q.city) {
+    const want = String(q.city).toLowerCase().trim();
+    const norm = CITY_ALIASES[want] ?? want;
+    results = results.filter((p) => p.city.toLowerCase() === norm);
+  }
+  const byNewest = (a: DbProperty, b: DbProperty) => b.createdAt.localeCompare(a.createdAt);
+  switch (q.sort) {
+    case 'newest': results.sort(byNewest); break;
+    case 'oldest': results.sort((a, b) => a.createdAt.localeCompare(b.createdAt)); break;
+    case 'price_asc': results.sort((a, b) => a.price - b.price); break;
+    case 'price_desc': results.sort((a, b) => b.price - a.price); break;
+    default: results.sort(byNewest);
+  }
+  const limit = Math.min(Number(q.limit) || 50, 100);
+  const offset = Math.max(Number(q.cursor) || 0, 0);
+  const page = results.slice(offset, offset + limit);
+  res.json({
+    properties: page.map((p) => serializeProperty(p, { populateSeller: true })),
+    total: results.length,
+  });
+});
+
+app.patch('/api/admin/properties/:id/featured', requireRole('admin'), (req, res) => {
+  const property = db.properties.find((p) => p.id === req.params.id);
+  if (!property) {
+    res.status(404).json({ error: 'Property not found' });
+    return;
+  }
+  property.featured = !property.featured;
+  property.updatedAt = new Date().toISOString();
+  save();
+  res.json({ property: serializeProperty(property) });
+});
 
 app.get('/api/admin/listings/pending', requireRole('admin'), (_req, res) => {
   const pending = db.properties

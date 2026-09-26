@@ -116,6 +116,58 @@ export interface SearchFilters {
   cursor?: string;
   limit?: number;
   q?: string;
+  status?: PropertyStatus;
+}
+
+// ---------- Admin Panel Types ----------
+
+export interface AdminDashboardStats {
+  totalUsers: number;
+  totalBuyers: number;
+  totalSellers: number;
+  totalAdmins: number;
+  totalProperties: number;
+  liveProperties: number;
+  pendingProperties: number;
+  rejectedProperties: number;
+  soldProperties: number;
+  totalLeads: number;
+  newLeads: number;
+  contactedLeads: number;
+  closedLeads: number;
+  inventoryValue: number;
+  recentSignups30d: number;
+  recentProperties30d: number;
+  recentLeads30d: number;
+  cityCounts: Record<string, number>;
+}
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: UserRole;
+  createdAt: string;
+  listingsCount: number;
+  leadsCount: number;
+}
+
+export interface AdminUsersResponse {
+  users: AdminUser[];
+  total: number;
+}
+
+export interface AdminPropertiesResponse {
+  properties: Property[];
+  total: number;
+}
+
+// ---------- Seller Property Leads ----------
+
+export interface PropertyLead extends Lead {
+  /** The property this lead was submitted for (always populated) */
+  property?: Property;
 }
 
 export function propertyId(p: Property): string {
